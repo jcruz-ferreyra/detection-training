@@ -89,7 +89,7 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
     logger.info("Dataset retrieval and extraction completed successfully")
 
 
-def update_dataset_yaml_path(ctx: YoloTrainingContext):
+def _update_dataset_yaml_path(ctx: YoloTrainingContext):
     """Update the 'path' value in a YOLO dataset YAML file."""
     logger.info(f"Updating {ctx.data_yaml_path.name} main path value")
 
