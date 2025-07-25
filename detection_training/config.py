@@ -12,7 +12,7 @@ LOCAL_DIR = Path(os.getenv("LOCAL_DIR")).resolve()
 
 DATA_FOLDER = Path(os.getenv("DATA_FOLDER"))
 MODELS_FOLDER = Path(os.getenv("MODELS_FOLDER"))
-EXPERIMENTS_FOLDER = Path(os.getenv("EXPERIMENT_FOLDER"))
+EXPERIMENTS_FOLDER = Path(os.getenv("EXPERIMENTS_FOLDER"))
 
 DATA_DIR = LOCAL_DIR / DATA_FOLDER
 MODELS_DIR = LOCAL_DIR / MODELS_FOLDER
@@ -25,7 +25,7 @@ for x in ["HOME_DIR", "LOCAL_DIR", "DATA_DIR", "MODELS_DIR"]:
 # Prepare Drive paths, and check correct access to them
 DRIVE_DIR = os.getenv("DRIVE_DIR")
 
-if DRIVE_DIR is not None and DRIVE_DIR.exists():
+if DRIVE_DIR is not None and Path(DRIVE_DIR).exists():
     DRIVE_DIR = Path(DRIVE_DIR).resolve()
 
     DRIVE_DATA_DIR = DRIVE_DIR / DATA_FOLDER
