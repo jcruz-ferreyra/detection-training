@@ -19,6 +19,9 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
     zipfile_name = "yolo.zip"
     colab_dataset_dir = Path("/content/dataset")
 
+    # Create extraction directory named after the zip file (without .zip extension)
+    extraction_dir = colab_dataset_dir / Path(zipfile_name).stem  # "yolo"
+
     # Create colab dataset directory
     colab_dataset_dir.mkdir(parents=True, exist_ok=True)
 
@@ -52,8 +55,11 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
         logger.info(f"Extracting dataset to: {colab_dataset_dir}")
         start = time.time()
 
+        # Create extraction directory
+        extraction_dir.mkdir(parents=True, exist_ok=True)
+
         with zipfile.ZipFile(dst, "r") as zip_ref:
-            zip_ref.extractall(colab_dataset_dir)
+            zip_ref.extractall(extraction_dir)
 
         extract_time = time.time() - start
 
@@ -101,7 +107,7 @@ def _train_yolo(ctx: YoloTrainingContext):
         # Start training
         logger.info("Starting model training...")
         results = model.train(
-            data=str(ctx.dataset_dir / ctx.data_yaml),
+            data=str(ctx.dataset_dir / "yolo" / ctx.data_yaml),
             val=True,
             save=True,
             project=str(ctx.project_dir),
