@@ -1,0 +1,23 @@
+input_folder: interim/
+output_folder: processed/dataset_v1
+
+output_storage: drive
+
+output_format: yolo
+
+split_datasets:
+  train:
+    - cctv_frames_v1/train
+    - cctv_random_v1
+    - coco_samples_v1
+    - drones_frames_v1
+    - pixaby_images_v1
+
+target_classes:
+  - person
+  - car
+  - bicycle
+  - motorcycle
+  - truck
+  - bus
+  - van

@@ -1,0 +1,25 @@
+dataset_folder: processed/dataset_v1
+data_yaml: data.yaml
+
+checkpoint: yolov8m/yolov8m.pt
+project_name: yolov8m_v1
+
+environment: colab
+
+training_params:
+  epochs: 50
+  patience: 5
+  batch: 16
+  imgsz: 960
+  device: 0
+  freeze: 10
+  optimizer: auto
+  lr0: 0.001
+  mosaic: 0
+  close_mosaic: 50
+  degrees: 5
+  scale: .15
+  shear: 5
+  cutmix: .1
+
+  
