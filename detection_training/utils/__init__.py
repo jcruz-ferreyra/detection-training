@@ -1,5 +1,5 @@
 from .logging import setup_logging
-from .config import load_config
+from .yaml import load_config
 
 __all__ = [
     # Logging

@@ -1,4 +1,4 @@
-# utils/config.py
+# utils/yaml_config.py
 from pathlib import Path
 
 import yaml

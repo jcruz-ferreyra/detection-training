@@ -2,7 +2,7 @@ dataset_folder: processed/dataset_v1/
 data_yaml: data.yaml
 
 checkpoint: yolov8m/yolov8m.pt
-project_name: yolov8m_v1
+project_name: yolov8m_v1_1
 
 environment: colab
 

@@ -1,15 +1,20 @@
 from pathlib import Path
 
-from detection_training.config import DATA_DIR, DRIVE_DATA_DIR, MODELS_DIR, DRIVE_MODELS_DIR
+import mlflow
+
+from detection_training.config import (
+    DATA_DIR,
+    DRIVE_DATA_DIR,
+    DRIVE_MODELS_DIR,
+    MODELS_DIR,
+)
+from detection_training.tracking import get_mlflow_uri, start_mlflow, stop_mlflow
 from detection_training.utils import load_config, setup_logging
 
 script_name = Path(__file__).parent.name
 logger = setup_logging(script_name, DATA_DIR)
 
-from detection_training.train_yolo import (
-    YoloTrainingContext,
-    train_yolo,
-)
+from detection_training.train_yolo import YoloTrainingContext, train_yolo
 
 logger.info("Starting dataset generation pipeline")
 
@@ -81,4 +86,15 @@ context = YoloTrainingContext(
 )
 
 # Task main function
-train_yolo(context)
+try:
+    start_mlflow(context.environment)
+    mlflow.set_tracking_uri(get_mlflow_uri())
+
+    train_yolo(context)
+
+except Exception as e:
+    logger.error(e)
+    raise
+
+finally:
+    stop_mlflow()

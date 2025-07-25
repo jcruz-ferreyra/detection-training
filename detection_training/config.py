@@ -12,6 +12,7 @@ LOCAL_DIR = Path(os.getenv("LOCAL_DIR")).resolve()
 
 DATA_FOLDER = Path(os.getenv("DATA_FOLDER"))
 MODELS_FOLDER = Path(os.getenv("MODELS_FOLDER"))
+EXPERIMENTS_FOLDER = Path(os.getenv("EXPERIMENT_FOLDER"))
 
 DATA_DIR = LOCAL_DIR / DATA_FOLDER
 MODELS_DIR = LOCAL_DIR / MODELS_FOLDER
@@ -24,17 +25,17 @@ for x in ["HOME_DIR", "LOCAL_DIR", "DATA_DIR", "MODELS_DIR"]:
 # Prepare Drive paths, and check correct access to them
 DRIVE_DIR = os.getenv("DRIVE_DIR")
 
-if DRIVE_DIR is not None:
+if DRIVE_DIR is not None and DRIVE_DIR.exists():
     DRIVE_DIR = Path(DRIVE_DIR).resolve()
+
     DRIVE_DATA_DIR = DRIVE_DIR / DATA_FOLDER
     DRIVE_MODELS_DIR = DRIVE_DIR / MODELS_FOLDER
-
-    if not DRIVE_DATA_DIR.exists():
-        DRIVE_DATA_DIR = None
-
-    if not DRIVE_MODELS_DIR.exists():
-        DRIVE_MODELS_DIR = None
+    DRIVE_EXPERIMENTS_DIR = DRIVE_DIR / EXPERIMENTS_FOLDER
 
 else:
     DRIVE_DATA_DIR = None
     DRIVE_MODELS_DIR = None
+    DRIVE_EXPERIMENTS_DIR = None
+
+# Load MLflow configs
+MLFLOW_PORT = Path(os.getenv("MLFLOW_PORT"))
