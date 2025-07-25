@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from ultralytics import YOLO
+import yaml
 
 from .types import YoloTrainingContext
 
@@ -88,6 +89,22 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
     logger.info("Dataset retrieval and extraction completed successfully")
 
 
+def update_dataset_yaml_path(ctx: YoloTrainingContext):
+    """Update the 'path' value in a YOLO dataset YAML file."""
+    logger.info(f"Updating {ctx.data_yaml_path.name} main path value")
+
+    # Read the existing YAML file
+    with open(ctx.data_yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    # Update the path value
+    data["path"] = str(ctx.data_yaml_path.parent)
+
+    # Write back to the file
+    with open(ctx.data_yaml_path, "w") as f:
+        yaml.safe_dump(data, f, default_flow_style=False)
+
+
 def _train_yolo(ctx: YoloTrainingContext):
     """Train YOLO model with specified configuration and return training results."""
     logger.info(f"Starting YOLO model training with checkpoint: {ctx.checkpoint_dir}")
@@ -107,7 +124,7 @@ def _train_yolo(ctx: YoloTrainingContext):
         # Start training
         logger.info("Starting model training...")
         results = model.train(
-            data=str(ctx.dataset_dir / "yolo" / ctx.data_yaml),
+            data=str(ctx.data_yaml_path),
             val=True,
             save=True,
             project=str(ctx.project_dir),
@@ -137,6 +154,9 @@ def train_yolo(ctx: YoloTrainingContext):
     if ctx.environment == "colab":
         # Set up dataset in working directory and change dataset dir attribute in ctx
         _retrieve_and_unzip_data(ctx)
+
+    # update yaml main path to dataset directory
+    _update_dataset_yaml_path(ctx)
 
     # Train model
     _train_yolo(ctx)
