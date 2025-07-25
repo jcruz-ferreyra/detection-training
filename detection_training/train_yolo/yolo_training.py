@@ -101,7 +101,7 @@ def _train_yolo(ctx: YoloTrainingContext):
         # Start training
         logger.info("Starting model training...")
         results = model.train(
-            data=str(ctx.dataset_dir),
+            data=str(ctx.dataset_dir / ctx.data_yaml),
             val=True,
             save=True,
             project=str(ctx.project_dir),

@@ -1,4 +1,4 @@
-dataset_folder: processed/dataset_v1
+dataset_folder: processed/dataset_v1/yolo
 data_yaml: data.yaml
 
 checkpoint: yolov8m/yolov8m.pt

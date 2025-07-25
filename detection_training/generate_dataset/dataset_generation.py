@@ -319,8 +319,8 @@ def _zip_dataset(ctx: DatasetGenerationContext) -> None:
     """Create a compressed zip archive of the generated dataset for drive storage."""
     logger.info(f"Creating zip archive of dataset: {ctx.output_dir}")
 
-    # Create zip file path (same directory as output, with .zip extension)
-    zip_path = ctx.output_dir.parent / f"{ctx.output_dir.name}.zip"
+    # Create zip file path
+    zip_path = ctx.output_dir / f"{ctx.output_dir.name}.zip"
 
     try:
         import shutil
