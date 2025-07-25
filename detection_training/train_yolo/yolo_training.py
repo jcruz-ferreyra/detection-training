@@ -104,7 +104,6 @@ def _train_yolo(ctx: YoloTrainingContext):
             data=str(ctx.dataset_dir),
             val=True,
             save=True,
-            device=0,
             project=str(ctx.project_dir),
             name=ctx.project_name,
             exist_ok=True,
