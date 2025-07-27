@@ -1,22 +1,14 @@
+from datetime import datetime
 import logging
 from pathlib import Path
+from typing import Any, Dict
 
 import mlflow
+import pytz
 from ultralytics import YOLO
 import yaml
 
-from detection_training.tracking import (
-    extract_model_architecture,
-    log_artifacts_from_directory,
-    log_dataset_config,
-    log_error,
-    log_experiment_info,
-    log_final_metrics,
-    log_model_artifacts,
-    log_model_config,
-    log_training_config,
-    set_training_status,
-)
+from detection_training.tracking import log_metrics, log_params, log_tags
 
 from .types import YoloTrainingContext
 
@@ -32,12 +24,9 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
     import zipfile
 
     zipfile_name = "yolo.zip"
-    colab_dataset_dir = Path("/content/dataset")
+    colab_data_dir = Path("/content/data")
 
-    # Create extraction directory named after the zip file (without .zip extension)
-    extraction_dir = colab_dataset_dir / Path(zipfile_name).stem  # "yolo"
-
-    # Create colab dataset directory
+    colab_dataset_dir = colab_data_dir / ctx.dataset_folder
     colab_dataset_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy zip file to colab
@@ -66,12 +55,13 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
         logger.error(f"Failed to copy dataset zip file: {e}")
         raise
 
-    try:
-        logger.info(f"Extracting dataset to: {colab_dataset_dir}")
-        start = time.time()
+    # Create extraction directory named after the dataset format
+    extraction_dir = colab_dataset_dir / "yolo"  # "yolo"
+    extraction_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create extraction directory
-        extraction_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        logger.info(f"Extracting dataset to: {colab_data_dir}")
+        start = time.time()
 
         with zipfile.ZipFile(dst, "r") as zip_ref:
             zip_ref.extractall(extraction_dir)
@@ -79,7 +69,7 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
         extract_time = time.time() - start
 
         # Count extracted files
-        extracted_files = len(list(colab_dataset_dir.rglob("*")))
+        extracted_files = len(list(colab_data_dir.rglob("*")))
         logger.info(f"Extracted {extracted_files} files in {extract_time:.2f} seconds")
 
     except zipfile.BadZipFile as e:
@@ -98,7 +88,7 @@ def _retrieve_and_unzip_data(ctx: YoloTrainingContext):
         logger.warning(f"Failed to clean up zip file: {e}")
 
     # Update context dataset directory
-    ctx.dataset_dir = colab_dataset_dir
+    ctx.data_dir = colab_data_dir
     logger.info(f"Updated dataset directory to: {ctx.dataset_dir}")
     logger.info("Dataset retrieval and extraction completed successfully")
 
@@ -119,84 +109,122 @@ def _update_dataset_yaml_path(ctx: YoloTrainingContext):
         yaml.safe_dump(data, f, default_flow_style=False)
 
 
-# def _train_yolo(ctx: YoloTrainingContext):
-#     """Train YOLO model with specified configuration and return training results."""
-#     logger.info(f"Starting YOLO model training with checkpoint: {ctx.checkpoint_dir}")
+def _get_model_architecture(ctx: YoloTrainingContext) -> str:
+    """Extract YOLO architecture name from checkpoint filename."""
+    try:
+        # Get filename without extension
+        checkpoint_stem = Path(ctx.checkpoint).stem
+        parts = checkpoint_stem.split("_")
 
-#     try:
-#         # Load YOLO model
-#         model = YOLO(ctx.checkpoint_dir)
-#         logger.info("YOLO model loaded successfully")
+        # Look for YOLO architecture patterns
+        for part in parts:
+            part_lower = part.lower()
+            if "yolo" in part_lower:
+                return part
 
-#         # Log training configuration
-#         logger.info("Training configuration:")
-#         logger.info(f"  Dataset: {ctx.dataset_dir}")
-#         logger.info(f"  Project: {ctx.project_dir}")
-#         logger.info(f"  Name: {ctx.project_name}")
-#         logger.info(f"  Training params: {ctx.training_params}")
+        # Fallback: return the checkpoint stem or "unknown"
+        logger.warning(f"Could not extract architecture from checkpoint: {ctx.checkpoint}")
+        return checkpoint_stem if checkpoint_stem else "unknown"
 
-#         # Start training
-#         logger.info("Starting model training...")
-#         results = model.train(
-#             data=str(ctx.data_yaml_path),
-#             val=True,
-#             save=True,
-#             project=str(ctx.project_dir),
-#             name=ctx.project_name,
-#             exist_ok=True,
-#             plots=True,
-#             **ctx.training_params,
-#         )
+    except Exception as e:
+        logger.warning(f"Failed to extract architecture from checkpoint {ctx.checkpoint}: {e}")
+        return "unknown"
 
-#         logger.info("YOLO training completed successfully")
-#         return results
 
-#     except Exception as e:
-#         logger.error(f"YOLO training failed: {e}")
-#         raise
+def _load_dataset_info(ctx: YoloTrainingContext) -> Dict[str, Any]:
+    """Load dataset information from YOLO data.yaml file and count samples."""
+    try:
+        with open(ctx.data_yaml_path, "r") as f:
+            data_config = yaml.safe_load(f)
+
+        # Count samples for each split
+        dataset_dir = ctx.data_yaml_path.parent
+        for split in ["train", "val", "test"]:
+            split_folder = data_config.get(split)
+            if split_folder:
+                split_path = dataset_dir / split_folder
+                if split_path.exists() and split_path.is_dir():
+                    try:
+                        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+                        sample_count = len(
+                            [
+                                f
+                                for f in split_path.iterdir()
+                                if f.is_file() and f.suffix.lower() in image_extensions
+                            ]
+                        )
+                        data_config[f"{split}_samples"] = sample_count
+                    except Exception as e:
+                        logger.warning(f"Failed to count {split} samples: {e}")
+                        data_config[f"{split}_samples"] = 0
+                else:
+                    logger.warning(f"Split directory not found: {split_path}")
+                    data_config[f"{split}_samples"] = 0
+            else:
+                data_config[f"{split}_samples"] = 0
+
+        desired_keys = [
+            "names",
+            "nc",
+            "train",
+            "train_samples",
+            "val",
+            "val_samples",
+            "test",
+            "test_samples",
+        ]
+        filtered_config = {key: data_config[key] for key in desired_keys if key in data_config}
+
+        return filtered_config
+
+    except Exception as e:
+        logger.warning(f"Failed to load dataset config from {ctx.data_yaml_path}: {e}")
+        return {}
 
 
 def _train_yolo(ctx: YoloTrainingContext):
     """Train YOLO model with specified configuration and return training results."""
     logger.info(f"Starting YOLO model training with checkpoint: {ctx.checkpoint_dir}")
 
+    mlflow.set_experiment(ctx.project_name)
+    logger.info(f"Set MLflow experiment: {ctx.project_name}")
+
     with mlflow.start_run():
         try:
             # Log experiment metadata
-            log_experiment_info(
+            log_tags(
+                experiment=ctx.project_name,
                 model_family="yolo",
-                model_architecture=extract_model_architecture(ctx.checkpoint_dir),
+                model_arch=_get_model_architecture(ctx),
                 environment=ctx.environment,
-                experiment_name=ctx.project_name,
-                checkpoint_source=str(ctx.checkpoint_dir),
+                task="detection",
+                purpose="active_learning"
             )
+
+            log_params(
+                model_arch=_get_model_architecture(ctx),
+                timestamp=datetime.now(pytz.UTC).isoformat()
+            )
+
+            # Log dataset configuration
+            dataset_info = _load_dataset_info(ctx)
+            log_params(dataset=ctx.dataset_folder, **dataset_info)
 
             # Load YOLO model
             model = YOLO(ctx.checkpoint_dir)
 
-            # Log model configuration (extract what you can from model)
-            log_model_config(
-                model_name=f"yolo_{ctx.project_name}",
-                dataset_dir=ctx.dataset_dir,
-                num_parameters=(
+            # Log model configuration
+            log_params(
+                checkpoint=str(ctx.checkpoint),
+                model_params=(
                     sum(p.numel() for p in model.model.parameters())
                     if hasattr(model, "model")
                     else None
                 ),
             )
 
-            # Log dataset configuration (extract from your YAML or data)
-            # You'd extract this info from your dataset YAML or inspection
-            # TODO
-            log_dataset_config(
-                num_classes=80,  # Extract from your dataset
-                class_names=["person", "car", ...],  # Extract from your dataset
-                train_samples=5000,  # Extract from your dataset stats
-                val_samples=1000,
-            )
-
             # Log training configuration
-            log_training_config(ctx.training_params, ctx.project_dir)
+            log_params(**ctx.training_params)
 
             # Training with custom callback for epoch metrics
             results = model.train(
@@ -212,25 +240,19 @@ def _train_yolo(ctx: YoloTrainingContext):
 
             # Log final metrics (extract from results object)
             if hasattr(results, "results_dict"):
-                log_final_metrics(results.results_dict)
-
-            # Log artifacts (generic approach)
-            output_dir = Path(ctx.project_dir) / ctx.project_name
-            log_artifacts_from_directory(
-                output_dir,
-                artifact_patterns=["*.png", "*.csv", "*.jpg"],
-                artifact_folder="training_outputs",
-            )
+                log_metrics(split="val", **results.results_dict)
 
             # Log model info (without uploading the file)
-            best_model_path = output_dir / "weights" / "best.pt"
-            log_model_artifacts(best_model_path)
+            log_params(
+                best_model=Path(ctx.project_name) / "weights" / "best.pt", artifacts=ctx.project_name
+            )
 
-            set_training_status("completed")
+            log_tags(status="completed")
             return results
 
         except Exception as e:
-            log_error(str(e), type(e).__name__)
+            log_tags(status="failed")
+            log_params(error_message=str(e), error_type=type(e).__name__)
             raise
 
 

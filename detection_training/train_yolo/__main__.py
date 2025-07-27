@@ -3,16 +3,16 @@ from pathlib import Path
 import mlflow
 
 from detection_training.config import (
-    DATA_DIR,
     DRIVE_DATA_DIR,
     DRIVE_MODELS_DIR,
-    MODELS_DIR,
+    LOCAL_DATA_DIR,
+    LOCAL_MODELS_DIR,
 )
 from detection_training.tracking import get_mlflow_uri, start_mlflow, stop_mlflow
 from detection_training.utils import load_config, setup_logging
 
 script_name = Path(__file__).parent.name
-logger = setup_logging(script_name, DATA_DIR)
+logger = setup_logging(script_name, LOCAL_DATA_DIR)
 
 from detection_training.train_yolo import YoloTrainingContext, train_yolo
 
@@ -53,33 +53,23 @@ elif ENVIRONMENT == "drive" and (DRIVE_DATA_DIR is None or DRIVE_MODELS_DIR is N
 DATASET_FOLDER = script_config["dataset_folder"]
 DATA_YAML = script_config["data_yaml"]
 
-if ENVIRONMENT == "local":
-    DATASET_DIR = DATA_DIR / DATASET_FOLDER
-elif ENVIRONMENT == "colab":
-    DATASET_DIR = DRIVE_DATA_DIR / DATASET_FOLDER
-
-logger.info(f"Dataset directory: {DATASET_DIR}")
-
-# Create paths for model checkpoint and project output (local or drive)
 CHECKPOINT = script_config["checkpoint"]
 PROJECT_NAME = script_config["project_name"]
 
-if ENVIRONMENT == "local":
-    CHECKPOINT_DIR = MODELS_DIR / CHECKPOINT
-    PROJECT_DIR = MODELS_DIR
-elif ENVIRONMENT == "colab":
-    CHECKPOINT_DIR = DRIVE_MODELS_DIR / CHECKPOINT
-    PROJECT_DIR = DRIVE_MODELS_DIR
+# Select data and models dir based on environment
+DATA_DIR = DRIVE_DATA_DIR if ENVIRONMENT == "colab" else LOCAL_DATA_DIR
+MODELS_DIR = DRIVE_MODELS_DIR if ENVIRONMENT == "colab" else LOCAL_MODELS_DIR
 
-logger.info(f"Checkpoint directory: {CHECKPOINT_DIR}")
-logger.info(f"Project directory: {PROJECT_DIR}")
+logger.info(f"Dataset directory: {DATA_DIR}")
+logger.info(f"Project directory: {MODELS_DIR}")
 
 # Select initial labelling batch
 context = YoloTrainingContext(
-    dataset_dir=DATASET_DIR,
+    data_dir=DATA_DIR,
+    dataset_folder=DATASET_FOLDER,
     data_yaml=DATA_YAML,
-    checkpoint_dir=CHECKPOINT_DIR,
-    project_dir=PROJECT_DIR,
+    models_dir=MODELS_DIR,
+    checkpoint=CHECKPOINT,
     project_name=PROJECT_NAME,
     training_params=TRAINING_PARAMS,
     environment=ENVIRONMENT,

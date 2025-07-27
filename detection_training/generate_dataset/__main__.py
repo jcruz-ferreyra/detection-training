@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from detection_training.config import DATA_DIR, DRIVE_DATA_DIR
+from detection_training.config import LOCAL_DATA_DIR, DRIVE_DATA_DIR
 from detection_training.utils import load_config, setup_logging
 
 script_name = Path(__file__).parent.name
-logger = setup_logging(script_name, DATA_DIR)
+logger = setup_logging(script_name, LOCAL_DATA_DIR)
 
 from detection_training.generate_dataset import (
     DatasetGenerationContext,
@@ -32,14 +32,12 @@ if missing_keys:
     logger.error(f"Missing required config keys: {missing_keys}")
     raise ValueError(f"Missing required config keys: {missing_keys}")
 
+INPUT_FOLDER = script_config["input_folder"]
+OUTPUT_FOLDER = script_config["output_folder"]
+
 OUTPUT_FORMAT = script_config["output_format"]
-
 SPLIT_DATASETS = script_config["split_datasets"]
-
 TARGET_CLASSES = script_config["target_classes"]
-
-# Create paths for frames directory
-INPUT_DIR = DATA_DIR / script_config["input_folder"]
 
 # Create paths for output directory (local or drive)
 OUTPUT_STORAGE = script_config["output_storage"]
@@ -52,18 +50,18 @@ elif OUTPUT_STORAGE == "drive" and DRIVE_DATA_DIR is None:
         "Error accesing Drive directory. Try setting local storage or check provided drive path."
     )
 
-if OUTPUT_STORAGE == "local":
-    OUTPUT_DIR = DATA_DIR / script_config["output_folder"] / OUTPUT_FORMAT
-elif OUTPUT_STORAGE == "drive":
-    OUTPUT_DIR = DRIVE_DATA_DIR / script_config["output_folder"] / OUTPUT_FORMAT
+# Select data dir based on storage configuration
+OUTPUT_DATA_DIR = DRIVE_DATA_DIR if OUTPUT_STORAGE == "drive" else LOCAL_DATA_DIR
 
-logger.info(f"Input main directory: {INPUT_DIR}")
-logger.info(f"Output main directory: {OUTPUT_DIR}")
+logger.info(f"Input main directory: {LOCAL_DATA_DIR}")
+logger.info(f"Output main directory: {OUTPUT_DATA_DIR}")
 
 # Select initial labelling batch
 context = DatasetGenerationContext(
-    input_dir=INPUT_DIR,
-    output_dir=OUTPUT_DIR,
+    input_data_dir=LOCAL_DATA_DIR,
+    input_folder=INPUT_FOLDER,
+    output_data_dir=OUTPUT_DATA_DIR,
+    output_folder=OUTPUT_FOLDER,
     output_format=OUTPUT_FORMAT,
     split_datasets=SPLIT_DATASETS,
     target_classes=TARGET_CLASSES,

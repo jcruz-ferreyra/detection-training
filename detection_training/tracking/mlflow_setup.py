@@ -15,23 +15,6 @@ def _check_experiments_dir_not_none():
         )
 
 
-def start_mlflow(environment="local"):
-    """
-    Start MLflow server based on environment.
-
-    Args:
-        environment (str): Either "local" or "colab"
-    """
-    _check_experiments_dir_not_none()
-
-    if environment == "local":
-        _start_local_mlflow()
-    elif environment == "colab":
-        _start_colab_mlflow()
-    else:
-        raise ValueError("Environment must be either 'local' or 'colab'")
-
-
 def _check_mlflow_running(port=MLFLOW_PORT):
     """Check if MLflow server is already running on the specified port."""
     try:
@@ -39,6 +22,17 @@ def _check_mlflow_running(port=MLFLOW_PORT):
         return response.status_code == 200
     except requests.exceptions.RequestException:
         return False
+
+
+def _wait_for_mlflow_server(timeout=30):
+    """Wait for MLflow server to start with timeout."""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if _check_mlflow_running():
+            return True
+        time.sleep(1)
+
+    raise TimeoutError(f"MLflow server failed to start within {timeout} seconds")
 
 
 def _start_local_mlflow():
@@ -70,6 +64,7 @@ def _start_local_mlflow():
             f"sqlite:///{db_path}",
             "--default-artifact-root",
             artifacts_path,
+            "--serve-artifacts",
         ]
     )
 
@@ -116,30 +111,62 @@ def _start_colab_mlflow():
     logger.info(f"MLflow server started at http://localhost:{MLFLOW_PORT}")
 
 
-def _wait_for_mlflow_server(timeout=30):
-    """Wait for MLflow server to start with timeout."""
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        if _check_mlflow_running():
-            return True
-        time.sleep(1)
+def start_mlflow(environment="local"):
+    """
+    Start MLflow server based on environment.
 
-    raise TimeoutError(f"MLflow server failed to start within {timeout} seconds")
+    Args:
+        environment (str): Either "local" or "colab"
+    """
+    _check_experiments_dir_not_none()
+
+    if environment == "local":
+        _start_local_mlflow()
+    elif environment == "colab":
+        _start_colab_mlflow()
+    else:
+        raise ValueError("Environment must be either 'local' or 'colab'")
 
 
 def stop_mlflow():
     """Stop MLflow server (useful for cleanup)."""
+    import platform
+
     try:
-        # Find and kill MLflow processes
-        result = subprocess.run(
-            ["pkill", "-f", f"mlflow.*server.*{MLFLOW_PORT}"], capture_output=True, text=True
-        )
-        if result.returncode == 0:
-            logger.info("MLflow server stopped")
-        else:
+        if platform.system() == "Windows":
+            # Find PID using the port
+            result = subprocess.run(
+                f"netstat -ano | findstr :{MLFLOW_PORT}",
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+
+            if result.stdout:
+                # Extract PID from netstat output
+                lines = result.stdout.strip().split("\n")
+                for line in lines:
+                    if "LISTENING" in line:
+                        pid = line.split()[-1]
+                        subprocess.run(f"taskkill /F /PID {pid}", shell=True)
+                        logger.info(f"MLflow server stopped (PID: {pid})")
+                        return
+
             logger.info("No MLflow server found running")
-    except subprocess.SubprocessError:
-        logger.error("Could not stop MLflow server")
+        else:
+            # Linux/Mac: Find PID by port and kill it
+            result = subprocess.run(
+                f"lsof -ti:{MLFLOW_PORT}", shell=True, capture_output=True, text=True
+            )
+            if result.stdout.strip():
+                pid = result.stdout.strip()
+                subprocess.run(f"kill -9 {pid}", shell=True)
+                logger.info(f"MLflow server stopped (PID: {pid})")
+                return
+
+        logger.info("MLflow server stopped")
+    except Exception as e:
+        logger.error(f"Could not stop MLflow server: {e}")
 
 
 def get_mlflow_uri():

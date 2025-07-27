@@ -5,8 +5,10 @@ from typing import Dict, List
 
 @dataclass
 class DatasetGenerationContext:
-    input_dir: Path
-    output_dir: Path
+    input_data_dir: Path
+    input_folder: str
+    output_data_dir: Path
+    output_folder: str
 
     output_format: str
 
@@ -25,3 +27,11 @@ class DatasetGenerationContext:
                 f"Unsupported output format: '{self.output_format}'. "
                 f"Supported formats: {supported_formats}. "
             )
+
+    @property
+    def input_dir(self) -> Path:
+        return self.input_data_dir / self.input_folder
+
+    @property
+    def output_dir(self) -> Path:
+        return self.output_data_dir / self.output_folder / self.output_format
