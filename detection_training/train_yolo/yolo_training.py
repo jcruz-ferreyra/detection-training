@@ -159,9 +159,6 @@ def _load_dataset_info(ctx: YoloTrainingContext) -> Dict[str, Any]:
                         data_config[f"{split}_samples"] = 0
                 else:
                     logger.warning(f"Split directory not found: {split_path}")
-                    data_config[f"{split}_samples"] = 0
-            else:
-                data_config[f"{split}_samples"] = 0
 
         desired_keys = [
             "names",
@@ -184,12 +181,17 @@ def _load_dataset_info(ctx: YoloTrainingContext) -> Dict[str, Any]:
 
 def _train_yolo(ctx: YoloTrainingContext):
     """Train YOLO model with specified configuration and return training results."""
-    logger.info(f"Starting YOLO model training with checkpoint: {ctx.checkpoint_dir}")
+    logger.info(f"Starting YOLO model training with checkpoint: {ctx.checkpoint_path}")
 
     mlflow.set_experiment(ctx.project_name)
     logger.info(f"Set MLflow experiment: {ctx.project_name}")
 
     with mlflow.start_run():
+        run_id = mlflow.active_run().info.run_id
+        project_name_with_run = f"{ctx.project_name}/{run_id}"
+        logger.info(f"MLflow run ID: {run_id}")
+        logger.info(f"Artifacts will be saved to: {project_name_with_run}")
+
         try:
             # Log experiment metadata
             log_tags(
@@ -198,12 +200,14 @@ def _train_yolo(ctx: YoloTrainingContext):
                 model_arch=_get_model_architecture(ctx),
                 environment=ctx.environment,
                 task="detection",
-                purpose="active_learning"
+                purpose="active_learning",
+                run_id=run_id,
             )
 
             log_params(
                 model_arch=_get_model_architecture(ctx),
-                timestamp=datetime.now(pytz.UTC).isoformat()
+                timestamp=datetime.now(pytz.UTC).isoformat(),
+                run_id=run_id,
             )
 
             # Log dataset configuration
@@ -211,7 +215,7 @@ def _train_yolo(ctx: YoloTrainingContext):
             log_params(dataset=ctx.dataset_folder, **dataset_info)
 
             # Load YOLO model
-            model = YOLO(ctx.checkpoint_dir)
+            model = YOLO(ctx.checkpoint_path)
 
             # Log model configuration
             log_params(
@@ -231,8 +235,8 @@ def _train_yolo(ctx: YoloTrainingContext):
                 data=str(ctx.data_yaml_path),
                 val=True,
                 save=True,
-                project=str(ctx.project_dir),
-                name=ctx.project_name,
+                project=str(ctx.models_dir),
+                name=project_name_with_run,
                 exist_ok=True,
                 plots=True,
                 **ctx.training_params,
@@ -244,7 +248,8 @@ def _train_yolo(ctx: YoloTrainingContext):
 
             # Log model info (without uploading the file)
             log_params(
-                best_model=Path(ctx.project_name) / "weights" / "best.pt", artifacts=ctx.project_name
+                best_model=Path(project_name_with_run) / "weights" / "best.pt",
+                artifacts=project_name_with_run,
             )
 
             log_tags(status="completed")

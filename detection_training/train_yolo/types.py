@@ -22,12 +22,12 @@ class YoloTrainingContext:
         return self.data_dir / self.dataset_folder
 
     @property
-    def checkpoint_dir(self) -> Path:
-        return self.models_dir / self.checkpoint
-
-    @property
     def project_dir(self) -> Path:
         return self.models_dir / self.project_name
+
+    @property
+    def checkpoint_path(self) -> Path:
+        return self.models_dir / self.checkpoint
 
     @property
     def data_yaml_path(self) -> Path:
