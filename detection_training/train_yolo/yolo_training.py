@@ -212,7 +212,7 @@ def _train_yolo(ctx: YoloTrainingContext):
 
             # Log dataset configuration
             dataset_info = _load_dataset_info(ctx)
-            log_params(dataset=ctx.dataset_folder, **dataset_info)
+            log_params(dataset=ctx.dataset_folder, data_yaml=ctx.data_yaml, **dataset_info)
 
             # Load YOLO model
             model = YOLO(ctx.checkpoint_path)

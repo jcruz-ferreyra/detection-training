@@ -1,0 +1,6 @@
+experiment: yolov8m_v1_1
+model_family: yolo
+
+split: val
+
+environment: local
