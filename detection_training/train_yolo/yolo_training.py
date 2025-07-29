@@ -244,7 +244,7 @@ def _train_yolo(ctx: YoloTrainingContext):
 
             # Log final metrics (extract from results object)
             if hasattr(results, "results_dict"):
-                log_metrics(split="val", **results.results_dict)
+                log_metrics(split="train", **results.results_dict)
 
             # Log model info (without uploading the file)
             log_params(

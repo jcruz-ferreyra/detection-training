@@ -4,3 +4,29 @@ model_family: yolo
 split: val
 
 environment: local
+
+yolo_params:
+  imgsz: 960
+  verbose: false
+  conf: 0.05
+  iou: 0.6
+  agnostic_nms: false
+
+class_label:
+  "0": person
+  "1": car
+  "2": bicycle
+  "3": motorcycle
+  "4": truck
+  "5": bus
+  "6": van
+category_classes:
+  person: [0]
+  twowheels: [2, 3]
+  car: [1]
+  heavy: [4, 5, 6]
+category_confidence:
+  person: 0.25
+  twowheels: 0.25
+  car: 0.5
+  heavy: 0.5

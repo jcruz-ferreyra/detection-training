@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ultralytics import YOLO
 
@@ -15,6 +15,11 @@ class ModelEvaluationContext:
     split: str
 
     environment: str
+
+    yolo_params: Dict[str, Any]
+    class_label: Dict[int, str]
+    category_classes: Dict[str, list]
+    class_confidence: List[Tuple[List[int], float]]
 
     dataset_folder: Optional[str] = None
     data_yaml: Optional[str] = None

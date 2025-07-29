@@ -39,6 +39,14 @@ EXPERIMENT = script_config["experiment"]
 MODEL_FAMILY = script_config["model_family"]
 SPLIT = script_config["split"]
 
+YOLO_PARAMS = script_config["yolo_params"]
+
+CLASS_LABEL = {int(k): v for k, v in script_config["class_label"].items()}
+CATEGORY_CLASSES = script_config["category_classes"]
+CATEGORY_CONFIDENCE = script_config["category_confidence"]
+
+CLASS_CONFIDENCE = [(CATEGORY_CLASSES[k], v) for k, v in CATEGORY_CONFIDENCE.items()]
+
 # Create paths for dataset input (local or drive)
 ENVIRONMENT = script_config["environment"]
 valid_environments = ["local", "colab"]
@@ -64,7 +72,11 @@ context = ModelEvaluationContext(
     experiment=EXPERIMENT,
     model_family=MODEL_FAMILY,
     split=SPLIT,
-    environment=ENVIRONMENT
+    environment=ENVIRONMENT,
+    yolo_params=YOLO_PARAMS,
+    class_label=CLASS_LABEL,
+    category_classes=CATEGORY_CLASSES,
+    class_confidence=CLASS_CONFIDENCE,
 )
 
 # Task main function

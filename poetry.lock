@@ -3190,30 +3190,29 @@ files = [
 
 [[package]]
 name = "supervision"
-version = "0.25.1"
+version = "0.26.1"
 description = "A set of easy-to-use utils that will come in handy in any Computer Vision project"
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "supervision-0.25.1-py3-none-any.whl", hash = "sha256:ebc015c22983bc64563beda75f5f529e465e4020b318da07948ce03148307a72"},
-    {file = "supervision-0.25.1.tar.gz", hash = "sha256:61781b4abe4fa6ff95c58af6aec7dd3451a78e7e6a797e9ea2787f93771dd031"},
+    {file = "supervision-0.26.1-py3-none-any.whl", hash = "sha256:43c55e2830f38f5750be7266208992dc16996da9c9478e067bc2617ebaf91c1a"},
+    {file = "supervision-0.26.1.tar.gz", hash = "sha256:af0db9c5459bb640cf0d31e9a4df3296020b4cd0dd484d8659eafe7b475b68f2"},
 ]
 
 [package.dependencies]
-contourpy = {version = ">=1.0.7", markers = "python_version >= \"3.8\" and python_version < \"3.13\""}
-defusedxml = ">=0.7.1,<0.8.0"
-matplotlib = {version = ">=3.6.0", markers = "python_version >= \"3.9\""}
-numpy = {version = ">=1.21.2", markers = "python_version < \"3.13\""}
+defusedxml = ">=0.7.1"
+matplotlib = ">=3.6.0"
+numpy = ">=1.21.2"
 opencv-python = ">=4.5.5.64"
 pillow = ">=9.4"
 pyyaml = ">=5.3"
 requests = ">=2.26.0"
-scipy = {version = ">=1.10.0,<2.0.0", markers = "python_version >= \"3.9\""}
+scipy = ">=1.10.0"
 tqdm = ">=4.62.3"
 
 [package.extras]
-metrics = ["pandas (>=2.0.0) ; python_version < \"3.13\"", "pandas (>=2.2.3) ; python_version >= \"3.13\""]
+metrics = ["pandas (>=2.0.0)"]
 
 [[package]]
 name = "sympy"
@@ -3620,4 +3619,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.11.0"
-content-hash = "8240acc31861d0ce0aa820807e3a7484cddf832fbe31d9f724b8e9d79a923d97"
+content-hash = "6f4568331924c043ee15d92a8210f23632cadcd08aad68bbb30a8982d2ce7efb"

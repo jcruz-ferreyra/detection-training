@@ -24,7 +24,7 @@ dependencies = [
     "pytest",
     "python-dotenv",
     "numpy (>=2,<2.3.0)",
-    "supervision (>=0.25.1,<0.26.0)",
+    "supervision (==0.26.1)",
     "opencv-python (>=4.12.0.88,<5.0.0.0)",
     "pyyaml (>=6.0.2,<7.0.0)",
     "ultralytics (>=8.3.163,<9.0.0)",

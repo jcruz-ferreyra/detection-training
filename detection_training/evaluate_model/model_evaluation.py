@@ -1,10 +1,17 @@
 import logging
 from pathlib import Path
+import time
+from typing import Dict, Optional, Tuple
 
 import mlflow
+import numpy as np
 import supervision as sv
+from supervision.metrics import MeanAveragePrecision, MeanAveragePrecisionResult
 from ultralytics import YOLO
 import yaml
+
+from detection_training.tracking import log_metrics
+from detection_training.utils import get_ultralytics_detections
 
 from .types import ModelEvaluationContext
 
@@ -155,6 +162,156 @@ def _load_dataset(ctx: ModelEvaluationContext):
         raise
 
 
+def _get_image_detections(
+    ctx: ModelEvaluationContext, frame: np.ndarray, filename: str
+) -> Optional[sv.Detections]:
+    """Get YOLO detections for single image."""
+    logger.debug(f"Running detection on image {filename}")
+
+    try:
+        dets = get_ultralytics_detections(
+            frame, ctx.model, ctx.yolo_params, ctx.class_confidence, bgr=True
+        )
+        logger.debug(f"Found {len(dets)} detections in frame {filename}")
+        return dets
+
+    except Exception as e:
+        logger.warning(f"Detection failed on frame {filename}: {e}")
+        return sv.Detections.empty()
+
+
+def _run_evaluation(
+    ctx: ModelEvaluationContext, ds: sv.DetectionDataset
+) -> Tuple[MeanAveragePrecisionResult, Optional[Dict[str, float]]]:
+    """Run model evaluation on dataset with timing metrics."""
+    logger.info(f"Starting evaluation on {len(ds)} images")
+
+    map_metric = MeanAveragePrecision()
+    detection_times = []
+
+    for image_path, image, ann in ds:
+        image_filename = Path(image_path).name
+
+        start_time = time.time()
+        dets = _get_image_detections(ctx, image, image_filename)
+        end_time = time.time()
+
+        detection_time = end_time - start_time
+        detection_times.append(detection_time)
+
+        map_metric.update(dets, ann)
+
+    map_result = map_metric.compute()
+
+    if detection_times:
+        time_result = {
+            "avg_time": sum(detection_times) / len(detection_times),
+            "min_time": min(detection_times),
+            "max_time": max(detection_times),
+        }
+
+        logger.info(
+            f"Detection timing results: "
+            f"Avg: {time_result['avg_time']:.4f}s, "
+            f"Min: {time_result['min_time']:.4f}s, "
+            f"Max: {time_result['max_time']:.4f}s"
+        )
+
+    else:
+        time_result = None
+
+    return map_result, time_result
+
+
+def _log_evaluation_metrics(
+    ctx: ModelEvaluationContext,
+    map_results: MeanAveragePrecisionResult,
+    time_result: Optional[Dict[str, float]],
+) -> None:
+    """Log evaluation metrics to MLflow with split prefix."""
+    logger.info("Logging evaluation metrics to MLflow")
+
+    # Log mAP metrics
+    map_metrics = {
+        "mAP_50_95": map_results.map50_95,
+        "mAP_50": map_results.map50,
+        "mAP_75": map_results.map75,
+    }
+
+    log_metrics(split=ctx.split, **map_metrics)
+
+    # Log per-class AP metrics (average across IoU thresholds)
+    if map_results.ap_per_class.size > 0:
+        per_class_metrics = {}
+        for class_id, ap_of_class in zip(map_results.matched_classes, map_results.ap_per_class):
+            # Average AP across all IoU thresholds for this class
+            avg_ap = ap_of_class.mean()
+            label = ctx.class_label[class_id]
+            per_class_metrics[f"AP_{label}"] = avg_ap
+
+        log_metrics(split=ctx.split, **per_class_metrics)
+
+    # Log object size-specific metrics if available
+    if map_results.small_objects is not None:
+        small_metrics = {
+            "mAP_50_95_small": map_results.small_objects.map50_95,
+            "mAP_50_small": map_results.small_objects.map50,
+            "mAP_75_small": map_results.small_objects.map75,
+        }
+        log_metrics(split=ctx.split, **small_metrics)
+
+    if map_results.medium_objects is not None:
+        medium_metrics = {
+            "mAP_50_95_medium": map_results.medium_objects.map50_95,
+            "mAP_50_medium": map_results.medium_objects.map50,
+            "mAP_75_medium": map_results.medium_objects.map75,
+        }
+        log_metrics(split=ctx.split, **medium_metrics)
+
+    if map_results.large_objects is not None:
+        large_metrics = {
+            "mAP_50_95_large": map_results.large_objects.map50_95,
+            "mAP_50_large": map_results.large_objects.map50,
+            "mAP_75_large": map_results.large_objects.map75,
+        }
+        log_metrics(split=ctx.split, **large_metrics)
+
+    # Log timing metrics if available
+    if time_result is not None:
+        log_metrics(split=ctx.split, **time_result)
+
+    logger.info("Evaluation metrics logged successfully")
+
+
+def _save_results(
+    ctx: ModelEvaluationContext,
+    map_results: MeanAveragePrecisionResult,
+    time_result: Optional[Dict[str, float]],
+) -> None:
+    """Save evaluation results to CSV file."""
+    logger.info("Saving evaluation results to CSV")
+
+    # Convert mAP results to pandas DataFrame
+    results_df = map_results.to_pandas()
+
+    # Add timing results if available
+    if time_result is not None:
+        for metric_name, metric_value in time_result.items():
+            results_df[metric_name] = metric_value
+
+    # Add context information
+    results_df["split"] = ctx.split
+    results_df["model_family"] = ctx.model_family
+    results_df["experiment"] = ctx.experiment
+    results_df["run_id"] = ctx.run_id
+
+    # Save to CSV
+    csv_path = ctx.artifacts_dir / f"{ctx.split}_results.csv"
+    results_df.to_csv(csv_path, index=False)
+
+    logger.info(f"Results saved to: {csv_path}")
+
+
 def evaluate_model(ctx: ModelEvaluationContext):
     logger.info("Starting model evaluation")
 
@@ -172,19 +329,10 @@ def evaluate_model(ctx: ModelEvaluationContext):
 
     # Continue the same MLflow run for logging evaluation metrics
     with mlflow.start_run(run_id=ctx.run_id):
+        map_result, time_result = _run_evaluation(ctx, ds)
 
-        results = _run_evaluation(ctx)
+        _log_evaluation_metrics(ctx, map_result, time_result)
 
-        # Log evaluation metrics to the same run
-        mlflow.log_metrics(
-            {
-                f"eval_{ctx.split}_mAP": results.map,
-                f"eval_{ctx.split}_precision": results.precision,
-                f"eval_{ctx.split}_recall": results.recall,
-                # etc.
-            }
-        )
-
-        _save_results(ctx, results)
+        _save_results(ctx, map_result, time_result)
 
     logger.info("Evaluation completed successfully")
